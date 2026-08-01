@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+backend/venv/
+backend/env/
+
+# Next.js Build
+frontend/.next/
+frontend/out/
+
+# Python Cache & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Audio & Temporary Files
+backend/temp/*
+!backend/temp/.gitkeep
+
+# Models (Download via setup script or Docker)
+backend/models/*.gguf
+backend/models/*.bin
+backend/models/piper/*
+
+# OS & Environment
+.DS_Store
+Thumbs.db
+*.env
+*.env.local
+.vscode/
+.idea/
