@@ -16,7 +16,7 @@ class TelemetryTracker:
             "tts_ms": 0,
             "total_latency_ms": 0,
             "tokens_sec": 0.0,
-            "model_name": "Llama-3-8B-Instruct (Q4_K_M)",
+            "model_name": "Llama-3.2-3B (Q4_K_M)",
             "kleidi_ai_enabled": False,
             "arch": platform.machine()
         }

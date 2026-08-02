@@ -9,13 +9,19 @@ CRITICAL INSTRUCTIONS:
 {
   "speech_text": "Short spoken explanation of findings (1-2 clear sentences).",
   "ui_component": {
-    "type": "bar_chart" | "line_chart" | "area_chart" | "pie_chart" | "scatter_chart" | "kpi_cards" | "table",
+    "type": "bar_chart" | "line_chart" | "area_chart" | "pie_chart" | "scatter_chart" | "kpi_cards" | "table" | "heatmap" | "radar_chart" | "treemap" | "boxplot" | "scatter_3d",
     "title": "Descriptive Chart Title",
     "xAxis": "Column name for X axis (if applicable)",
     "yAxis": "Column name for Y axis (if applicable)",
+    "zAxis": "Column name for Z axis (for scatter_3d)",
     "data": [
       {"name": "Jan", "value": 45000, "secondary": 12000}, ...
     ],
+    "matrix": {
+      "xLabels": ["ColA", "ColB"],
+      "yLabels": ["ColA", "ColB"],
+      "matrix": [[1.0, 0.85], [0.85, 1.0]]
+    },
     "kpis": [
       {"label": "Total Revenue", "value": "$312,000", "change": "+14.2%"}
     ]
@@ -30,6 +36,11 @@ CRITICAL INSTRUCTIONS:
 - scatter_chart: Correlation analysis (e.g., Revenue vs Profit, Age vs Spending).
 - kpi_cards: Key performance indicators / summary stats.
 - table: Detailed tabular listing for complex top-N listings.
+- heatmap: Correlation matrix or 2D intensity grid.
+- radar_chart: Multi-axis comparative spider analysis across performance metrics.
+- treemap: Hierarchical budget or category breakdown.
+- boxplot: Statistical distribution (min, q1, median, q3, max, outliers).
+- scatter_3d: 3-variable spatial correlation (X, Y, Z depth & scale).
 
 DATASETS AND CONTEXT:
 """
@@ -37,3 +48,4 @@ DATASETS AND CONTEXT:
 def build_copilot_prompt(dataset_summary: str, user_query: str) -> str:
     """Build complete prompt combining dataset schema, statistics, and user question."""
     return f"{SYSTEM_PROMPT}\nDataset Schema & Statistics:\n{dataset_summary}\n\nUser Question:\n{user_query}\n\nGenerate JSON:"
+

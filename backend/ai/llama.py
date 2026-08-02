@@ -55,16 +55,25 @@ class LlamaEngine:
 
         analysis_result = pandas_agent.analyze(df, user_query)
         
+        ui_comp = {
+            "type": analysis_result.get("type", "bar_chart"),
+            "title": analysis_result.get("title", "Dataset Analysis"),
+            "xAxis": analysis_result.get("xAxis", "Category"),
+            "yAxis": analysis_result.get("yAxis", "Value"),
+            "zAxis": analysis_result.get("zAxis", "Z-Axis"),
+            "data": analysis_result.get("data", []),
+            "kpis": analysis_result.get("kpis", [])
+        }
+        if "matrix" in analysis_result:
+            ui_comp["matrix"] = analysis_result["matrix"]
+
         response_json = {
             "speech_text": analysis_result.get("speech_text", "Here is the dataset analysis."),
-            "ui_component": {
-                "type": analysis_result.get("type", "bar_chart"),
-                "title": analysis_result.get("title", "Dataset Analysis"),
-                "xAxis": analysis_result.get("xAxis", "Category"),
-                "yAxis": analysis_result.get("yAxis", "Value"),
-                "data": analysis_result.get("data", []),
-                "kpis": analysis_result.get("kpis", [])
-            }
+            "ui_component": ui_comp,
+            "code": analysis_result.get("code", ""),
+            "stdout": analysis_result.get("stdout", ""),
+            "execution_time_ms": analysis_result.get("execution_time_ms", 0.0),
+            "execution_error": analysis_result.get("execution_error", None)
         }
 
         # Benchmark latency simulation (e.g. 240ms inference time)

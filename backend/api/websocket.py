@@ -97,13 +97,29 @@ async def websocket_stream_endpoint(websocket: WebSocket):
                 speech_text = copilot_response.get("speech_text", "Here is your requested data analysis.")
                 ui_component = copilot_response.get("ui_component", {})
 
+                # Compute preliminary telemetry (LLM complete, TTS pending)
+                prelim_telemetry = telemetry.compute_metrics(whisper_ms, llama_ms, 0.0, generated_tokens)
+
+                # ZERO-LATENCY HACK: Immediately stream copilot_json to render UI chart BEFORE TTS completes!
+                await websocket.send_json({
+                    "type": "copilot_json",
+                    "transcript": user_transcript,
+                    "speech_text": speech_text,
+                    "ui_component": ui_component,
+                    "telemetry": prelim_telemetry,
+                    "code": copilot_response.get("code", ""),
+                    "stdout": copilot_response.get("stdout", ""),
+                    "execution_time_ms": copilot_response.get("execution_time_ms", 0.0),
+                    "execution_error": copilot_response.get("execution_error", None)
+                })
+
                 await websocket.send_json({
                     "type": "processing",
                     "stage": "Piper TTS",
                     "message": "Synthesizing voice response..."
                 })
 
-                # STAGE 3: Piper Text-to-Speech
+                # STAGE 3: Piper Text-to-Speech (runs in parallel after UI is rendered)
                 output_speech_wav = os.path.join(TEMP_DIR, f"response_{int(time.time())}.wav")
                 audio_path, tts_ms = tts_engine.synthesize(speech_text, output_speech_wav)
 
@@ -113,17 +129,28 @@ async def websocket_stream_endpoint(websocket: WebSocket):
                     with open(audio_path, "rb") as af:
                         output_audio_b64 = base64.b64encode(af.read()).decode("utf-8")
 
-                # Compute performance metrics & telemetry
-                telemetry_data = telemetry.compute_metrics(whisper_ms, llama_ms, tts_ms, generated_tokens)
+                # Compute final performance metrics & telemetry
+                final_telemetry = telemetry.compute_metrics(whisper_ms, llama_ms, tts_ms, generated_tokens)
 
-                # Send complete payload back to frontend
+                # Send audio stream payload and complete copilot response
+                await websocket.send_json({
+                    "type": "copilot_audio",
+                    "audio_b64": output_audio_b64,
+                    "speech_text": speech_text,
+                    "telemetry": final_telemetry
+                })
+
                 await websocket.send_json({
                     "type": "copilot_response",
                     "transcript": user_transcript,
                     "speech_text": speech_text,
                     "ui_component": ui_component,
                     "audio_b64": output_audio_b64,
-                    "telemetry": telemetry_data
+                    "telemetry": final_telemetry,
+                    "code": copilot_response.get("code", ""),
+                    "stdout": copilot_response.get("stdout", ""),
+                    "execution_time_ms": copilot_response.get("execution_time_ms", 0.0),
+                    "execution_error": copilot_response.get("execution_error", None)
                 })
 
         except WebSocketDisconnect:

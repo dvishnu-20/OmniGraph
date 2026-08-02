@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Sparkles, Cpu, Wifi, WifiOff, Send, HelpCircle, MessageSquare, ArrowLeft, LayoutDashboard } from 'lucide-react';
+import { Sparkles, Cpu, Wifi, WifiOff, Send, HelpCircle, MessageSquare, ArrowLeft, LayoutDashboard, BarChart3, Terminal, Database, Camera, Volume2, Settings2, SlidersHorizontal } from 'lucide-react';
 
 import { useRecorder } from '../../hooks/useRecorder';
 import { useWebSocket } from '../../hooks/useWebSocket';
@@ -14,6 +14,10 @@ import { Telemetry } from '../../components/Telemetry';
 import { AudioPlayer } from '../../components/AudioPlayer';
 import { DatasetSelector } from '../../components/DatasetSelector';
 import { Loading } from '../../components/Loading';
+import { PythonSandbox } from '../../components/PythonSandbox';
+import { DatabaseConnector } from '../../components/DatabaseConnector';
+import { WebRTCVoiceController } from '../../components/WebRTCVoiceController';
+import { VisionAnalyzer } from '../../components/VisionAnalyzer';
 
 export default function CopilotStudioPage() {
   const { isRecording, audioLevel, transcript, startRecording, stopRecording } = useRecorder();
@@ -30,6 +34,23 @@ export default function CopilotStudioPage() {
 
   const [textInput, setTextInput] = useState('');
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [sandboxResponse, setSandboxResponse] = useState<any>(null);
+  const [activeStudioTab, setActiveStudioTab] = useState<'canvas' | 'python' | 'sql' | 'vision'>('canvas');
+  const [showWebRTCSettings, setShowWebRTCSettings] = useState(false);
+
+  // Sync latestResponse from WebSocket to state & auto-select Canvas tab
+  useEffect(() => {
+    if (latestResponse) {
+      setSandboxResponse(null);
+      setActiveStudioTab('canvas');
+    }
+  }, [latestResponse]);
+
+  const currentUiComponent = sandboxResponse?.ui_component || latestResponse?.ui_component;
+  const currentCode = sandboxResponse ? sandboxResponse.code : (latestResponse?.code || '');
+  const currentStdout = sandboxResponse ? sandboxResponse.stdout : (latestResponse?.stdout || '');
+  const currentTimeMs = sandboxResponse ? sandboxResponse.execution_time_ms : (latestResponse?.execution_time_ms || 0);
+  const currentError = sandboxResponse ? sandboxResponse.error : (latestResponse?.execution_error || null);
 
   // Sync live speech transcript to text input field
   useEffect(() => {
@@ -68,11 +89,15 @@ export default function CopilotStudioPage() {
   };
 
   const sampleQueries = [
+    'Run linear regression predicting next month sales',
+    'Find top 3 outliers in profit margin',
+    'Show correlation heatmap',
+    'Show radar chart comparison',
+    'Show treemap budget breakdown',
+    'Show boxplot distribution',
+    'Show 3d scatter plot',
     'Plot revenue by month',
-    'Show revenue breakdown by region',
-    'Compare profit across product categories',
-    'Show dataset key performance indicators',
-    'Show correlation between units sold and revenue'
+    'Show dataset key performance indicators'
   ];
 
   return (
@@ -105,8 +130,20 @@ export default function CopilotStudioPage() {
           </div>
         </div>
 
-        {/* Server Connection Indicator */}
-        <div className="flex items-center gap-2">
+        {/* Server Connection Indicator & WebRTC Settings Toggle */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowWebRTCSettings(!showWebRTCSettings)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 ${
+              showWebRTCSettings
+                ? 'bg-indigo-600 text-white border-indigo-400'
+                : 'bg-gray-800/80 text-gray-300 hover:text-white border-gray-700'
+            }`}
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Audio & WebRTC Config</span>
+          </button>
+
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border ${
             isConnected
               ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
@@ -115,7 +152,7 @@ export default function CopilotStudioPage() {
             {isConnected ? (
               <>
                 <Wifi className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-                <span>Backend Connected</span>
+                <span>Backend Online</span>
               </>
             ) : (
               <>
@@ -127,14 +164,25 @@ export default function CopilotStudioPage() {
         </div>
       </header>
 
+      {/* Optional WebRTC Voice Settings Drawer */}
+      {showWebRTCSettings && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass-panel p-4 rounded-2xl border border-indigo-500/30 shadow-xl"
+        >
+          <WebRTCVoiceController />
+        </motion.div>
+      )}
+
       {/* Main Content Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Voice Controller & Dataset Tools (5 cols) */}
+        {/* Left Column: Dataset & Voice Hub (5 cols) */}
         <div className="lg:col-span-5 space-y-6">
           {/* Dataset Selector Card */}
           <DatasetSelector onSelectDataset={selectDataset} />
 
-          {/* Voice Input Mic Card */}
+          {/* Voice & Prompt Mic Card */}
           <div className="glass-panel p-6 rounded-2xl border border-indigo-500/20 shadow-xl text-center">
             <MicButton
               isRecording={isRecording}
@@ -160,7 +208,7 @@ export default function CopilotStudioPage() {
                 type="text"
                 value={textInput}
                 onChange={(e) => setTextInput(e.target.value)}
-                placeholder="Or type your dataset question..."
+                placeholder="Ask any question about your data..."
                 className="flex-1 bg-gray-900/90 text-xs text-gray-100 border border-gray-700 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 outline-none transition-all placeholder:text-gray-500 font-medium"
               />
               <button
@@ -176,7 +224,7 @@ export default function CopilotStudioPage() {
             {/* Quick Sample Queries */}
             <div className="mt-6 pt-4 border-t border-gray-800 text-left">
               <span className="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5 mb-3">
-                <HelpCircle className="w-3.5 h-3.5 text-indigo-400" /> Quick Samples:
+                <HelpCircle className="w-3.5 h-3.5 text-indigo-400" /> Quick Analytics Presets:
               </span>
               <div className="flex flex-wrap gap-2">
                 {sampleQueries.map((q, idx) => (
@@ -196,8 +244,61 @@ export default function CopilotStudioPage() {
           </div>
         </div>
 
-        {/* Right Column: Generative UI Stage & Audio Answers (7 cols) */}
-        <div className="lg:col-span-7 space-y-6">
+        {/* Right Column: Sleek Tabbed Studio Workspace (7 cols) */}
+        <div className="lg:col-span-7 space-y-4">
+          {/* Studio Workspace Dock Nav Tabs */}
+          <div className="p-1.5 bg-gray-900/90 border border-gray-800 rounded-2xl flex items-center justify-between shadow-xl overflow-x-auto">
+            <div className="flex items-center gap-1 min-w-max">
+              <button
+                onClick={() => setActiveStudioTab('canvas')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                  activeStudioTab === 'canvas'
+                    ? 'bg-gradient-to-r from-indigo-600 to-cyan-600 text-white shadow-lg shadow-indigo-500/30'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
+                }`}
+              >
+                <BarChart3 className="w-4 h-4" />
+                <span>Generative Canvas</span>
+              </button>
+
+              <button
+                onClick={() => setActiveStudioTab('python')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                  activeStudioTab === 'python'
+                    ? 'bg-gradient-to-r from-indigo-600 to-cyan-600 text-white shadow-lg shadow-indigo-500/30'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
+                }`}
+              >
+                <Terminal className="w-4 h-4" />
+                <span>Python IDE</span>
+              </button>
+
+              <button
+                onClick={() => setActiveStudioTab('sql')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                  activeStudioTab === 'sql'
+                    ? 'bg-gradient-to-r from-indigo-600 to-cyan-600 text-white shadow-lg shadow-indigo-500/30'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
+                }`}
+              >
+                <Database className="w-4 h-4" />
+                <span>SQL Studio</span>
+              </button>
+
+              <button
+                onClick={() => setActiveStudioTab('vision')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                  activeStudioTab === 'vision'
+                    ? 'bg-gradient-to-r from-indigo-600 to-cyan-600 text-white shadow-lg shadow-indigo-500/30'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
+                }`}
+              >
+                <Camera className="w-4 h-4" />
+                <span>Vision OCR</span>
+              </button>
+            </div>
+          </div>
+
           {/* Realtime Processing State */}
           {processingStage && (
             <Loading stage={processingStage} message={processingMessage} />
@@ -206,15 +307,55 @@ export default function CopilotStudioPage() {
           {/* Audio Synthesized Answer Banner */}
           {latestResponse && (
             <AudioPlayer
-              speechText={latestResponse.speech_text}
+              speechText={sandboxResponse ? sandboxResponse.speech_text : latestResponse.speech_text}
               audioB64={latestResponse.audio_b64}
               transcript={latestResponse.transcript || userTranscript}
               onPlayStateChange={setIsSpeaking}
             />
           )}
 
-          {/* Dynamic Generative Chart Canvas */}
-          <ChartRenderer spec={latestResponse?.ui_component} />
+          {/* Tab 1: Dynamic Generative Chart Canvas */}
+          {activeStudioTab === 'canvas' && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+              <ChartRenderer spec={currentUiComponent} />
+            </motion.div>
+          )}
+
+          {/* Tab 2: Autonomous Python Sandbox IDE Panel */}
+          {activeStudioTab === 'python' && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+              <PythonSandbox
+                initialCode={currentCode || '# Autonomous Python Sandbox Engine\nprint(f"Dataset shape: {df.shape}")\nprint(df.describe())'}
+                initialStdout={currentStdout}
+                initialTimeMs={currentTimeMs}
+                initialError={currentError}
+                onExecuteResult={(result) => {
+                  setSandboxResponse(result);
+                  setActiveStudioTab('canvas');
+                }}
+              />
+            </motion.div>
+          )}
+
+          {/* Tab 3: Enterprise SQL Database Connector Panel */}
+          {activeStudioTab === 'sql' && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+              <DatabaseConnector onExecuteResult={(result) => {
+                setSandboxResponse(result);
+                setActiveStudioTab('canvas');
+              }} />
+            </motion.div>
+          )}
+
+          {/* Tab 4: Multi-Modal Vision & Document Analyzer Panel */}
+          {activeStudioTab === 'vision' && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+              <VisionAnalyzer onVisionResult={(result) => {
+                setSandboxResponse(result);
+                setActiveStudioTab('canvas');
+              }} />
+            </motion.div>
+          )}
         </div>
       </div>
 

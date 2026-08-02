@@ -1,13 +1,36 @@
-FROM python:3.11-slim
+# Multi-Stage Arm KleidiAI Native Production Dockerfile for OmniGraph Backend
+FROM python:3.11-slim AS builder
 
-WORKDIR /app
+WORKDIR /build
 
+# Install system build tools for CMake compilation on Arm64/x86
 RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
     git \
     ffmpeg \
+    curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Clone and compile llama.cpp natively with GGML Arm KleidiAI CPU acceleration
+RUN git clone https://github.com/ggerganov/llama.cpp.git && \
+    cd llama.cpp && \
+    mkdir build && cd build && \
+    cmake .. -DGGML_CPU_KLEIDIAI=ON -DCMAKE_BUILD_TYPE=Release && \
+    cmake --build . --config Release -j 2
+
+# Final Runtime Image Stage
+FROM python:3.11-slim AS runtime
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy compiled llama.cpp CLI binary from builder stage
+COPY --from=builder /build/llama.cpp/build/bin/llama-cli /usr/local/bin/llama-cli
 
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
@@ -16,6 +39,7 @@ COPY backend/ /app/backend/
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
+ENV GGML_CPU_KLEIDIAI=1
 
 EXPOSE 8000
 

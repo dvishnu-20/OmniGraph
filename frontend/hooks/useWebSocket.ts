@@ -21,6 +21,10 @@ export interface CopilotResponse {
   ui_component: any;
   audio_b64: string;
   telemetry: TelemetryData;
+  code?: string;
+  stdout?: string;
+  execution_time_ms?: number;
+  execution_error?: string | null;
 }
 
 export function useWebSocket(url: string = 'ws://localhost:8000/stream') {
@@ -51,11 +55,38 @@ export function useWebSocket(url: string = 'ws://localhost:8000/stream') {
           try {
             const data = JSON.parse(event.data);
             if (data.type === 'connected') {
-              if (data.telemetry) setTelemetry(data.telemetry);
+              if (data.telemetry) {
+                setTelemetry((prev) => ({ ...prev, ...data.telemetry }));
+              }
             } else if (data.type === 'processing') {
               if (data.stage) setProcessingStage(data.stage);
               if (data.message) setProcessingMessage(data.message);
               if (data.transcript) setUserTranscript(data.transcript);
+            } else if (data.type === 'copilot_json') {
+              // Immediately clear loading state and render UI component chart
+              setProcessingStage('');
+              setProcessingMessage('');
+              setUserTranscript(data.transcript || '');
+              setLatestResponse((prev) => ({
+                transcript: data.transcript || '',
+                speech_text: data.speech_text || '',
+                ui_component: data.ui_component,
+                audio_b64: prev?.audio_b64 || '',
+                telemetry: data.telemetry,
+                code: data.code,
+                stdout: data.stdout,
+                execution_time_ms: data.execution_time_ms,
+                execution_error: data.execution_error
+              }));
+              if (data.telemetry) setTelemetry(data.telemetry);
+            } else if (data.type === 'copilot_audio') {
+              // Attach synthesized audio once TTS completes
+              setLatestResponse((prev) => prev ? {
+                ...prev,
+                audio_b64: data.audio_b64 || prev.audio_b64,
+                telemetry: data.telemetry || prev.telemetry
+              } : null);
+              if (data.telemetry) setTelemetry(data.telemetry);
             } else if (data.type === 'copilot_response') {
               setProcessingStage('');
               setProcessingMessage('');
@@ -88,8 +119,25 @@ export function useWebSocket(url: string = 'ws://localhost:8000/stream') {
 
     connect();
 
+    // Live CPU & RAM system telemetry poll interval (every 4 seconds)
+    const telemetryInterval = setInterval(() => {
+      fetch('http://localhost:8000/api/health')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.system) {
+            setTelemetry((prev) => ({
+              ...prev,
+              ...data.system,
+              kleidi_ai_enabled: data.kleidi_ai ?? prev?.kleidi_ai_enabled ?? false
+            } as TelemetryData));
+          }
+        })
+        .catch(() => {});
+    }, 4000);
+
     return () => {
       if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (telemetryInterval) clearInterval(telemetryInterval);
       if (wsRef.current) wsRef.current.close();
     };
   }, [url]);

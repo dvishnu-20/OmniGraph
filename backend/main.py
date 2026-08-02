@@ -12,6 +12,7 @@ if ROOT_DIR not in sys.path:
 
 from backend.api.routes import router as api_router
 from backend.api.websocket import ws_router
+from backend.api.webrtc import router as webrtc_router
 from backend.data.csv_loader import csv_loader
 
 app = FastAPI(
@@ -32,6 +33,7 @@ app.add_middleware(
 # Include routers
 app.include_router(api_router)
 app.include_router(ws_router)
+app.include_router(webrtc_router)
 
 # Serve temp audio files if requested statically
 temp_dir = os.path.join(os.path.dirname(__file__), "temp")
